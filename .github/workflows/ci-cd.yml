@@ -92,3 +92,52 @@ jobs:
           path: target/surefire-reports/
           if-no-files-found: ignore
 
+  sonarQube-scan:
+    name: SonarQube-Scan
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+ 
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: maven
+ 
+      - name: Cache SonarCloud packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
+ 
+      - name: Compile project for analysis
+        run: mvn -B compile -DskipTests
+ 
+      - name: SonarQube code analysis
+        uses: SonarSource/sonarqube-scan-action@v4
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
+        with:
+          args: >
+            -Dsonar.projectKey=${{ env.SONAR_PROJECT_KEY }}
+            -Dsonar.organization=${{ env.SONAR_ORGANIZATION }}
+            -Dsonar.java.binaries=target/classes
+ 
+      - name: SonarCloud Quality Gate Check
+        id: quality-gate
+        uses: phwt/sonarqube-quality-gate-action@v1
+        with:
+          sonar-project-key: ${{ env.SONAR_PROJECT_KEY }}
+          sonar-host-url: https://sonarcloud.io
+          sonar-token: ${{ env.SONAR_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          branch: main
+          fail-on-quality-gate-error: true
+

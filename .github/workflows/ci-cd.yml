@@ -141,3 +141,46 @@ jobs:
           branch: dev
           fail-on-quality-gate-error: true
 
+  trivy-scan:
+    name: Trivy Security Scan
+    runs-on: ubuntu-latest
+    needs: sonarQube-scan
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+ 
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: maven
+ 
+      - name: Populate Maven cache
+        run: |
+          mvn -B dependency:resolve -DskipTests \
+            --no-transfer-progress
+ 
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: app-jar
+          path: target
+ 
+      - name: Run Trivy filesystem scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          severity: 'CRITICAL,HIGH'
+          format: 'table'
+          exit-code: '0'
+          ignore-unfixed: true
+ 
+      - name: Upload Trivy results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-fs-report
+          path: trivy-results.*
+          if-no-files-found: ignore
